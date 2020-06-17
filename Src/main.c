@@ -209,9 +209,9 @@ void PID_Position(int deg_mm,TIM_HandleTypeDef *htim)
    Ki=0.5;
    Kd=0.9;
  // 	Kp=0.1;
-	            // Kp=0.05;
+	           
 	//	Ki=2;
-	            //   Ki=5;
+	            
 	//	Kd=0.03;
     vitri=pulse;
     Error=deg_mm-vitri;   
