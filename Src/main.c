@@ -64,12 +64,12 @@ float deg_mm,deg,vitri;
 unsigned int RUN = 1, forward_reverse = 1, rLeft;
 int rate_mm_int=0,deg_mm_int=0;
 
-char Rx_data[10];
+char Rx_data[20];
 int dex1 = 0;
 int dex2 = 0;
 unsigned int checkData;
 char dataSend[1];
-char Rx_data_temp[10];
+char Rx_data_temp[20];
 int i = 0, j = 0;
 int Start_Process = 0;
 int pre_pulse = 0;
@@ -91,22 +91,24 @@ void chieuquay(int forward_reverse)
     {
         HAL_GPIO_WritePin(GPIOC,GPIO_PIN_15, GPIO_PIN_SET);
         HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13, GPIO_PIN_RESET);
-    }
+    }   
     else if(forward_reverse==0)
-    {
+    {    
         HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13, GPIO_PIN_SET);
         HAL_GPIO_WritePin(GPIOC,GPIO_PIN_15, GPIO_PIN_RESET);
-    }
-}
+    }   
+}       
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-	  HAL_UART_Receive_IT(&huart5,(uint8_t *)Rx_data,1);  
-    checkData=Rx_data[0];                 //dua byte dau tien cua Rx_data vao checkData
-    if(checkData==37)              
-		{
+	  HAL_UART_Receive_IT(&huart5,(uint8_t *)Rx_data,1);      //Nhan du lieu va luu vao Rx_data
+    checkData=Rx_data[0];                                   //byte[0] cua Rx_data -> checkData
+    if(checkData==37)                                       //check xem byte[0]== '%' (ki tu bat dau frame)
+		{                
+		 dataSend[0]='A';                                       // Neu dung frame -> gui ACK len PC
+		 HAL_UART_Transmit_IT(&huart5,(uint8_t *)dataSend,1);
 		 start_data=1;
-		}			
-	if (checkData==101)                //e dai dien etx
+		}
+	if (checkData==101)                // Ki tu ket thuc chuoi 'e'=101
     {
         i = 0;
         Start_Process=1;                 //   % data e
@@ -114,21 +116,22 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     }
 	 if(start_data==1)
 	 {
-		 if(checkData!=37)                     //   %
+		 if(checkData!=37)                   
 			{ 
-				Rx_data_temp[i]=checkData;   //nhan vao Rx_data_temp
+				Rx_data_temp[i]=checkData;   //luu vao mang Rx_data_temp[]
 				i+=1;
 			}
 		}
+	 
 }
 void send_data(void)
 {
     if (speed==1)
     {
-        sprintf(rateConvertString,"%0.0f\r\n", rate);
-			  while (dataSend[0]!=10)
+        sprintf(rateConvertString,"%0.0f\r\n", rate);       
+			  while (dataSend[0]!=10)                      // ki tu xuong dong \r\n ='10'
         {
-        dataSend[0]=(int)rateConvertString[j];
+        dataSend[0]=(int)rateConvertString[j];             
         j+=1;
         HAL_UART_Transmit(&huart5,(uint8_t *)dataSend,1,100);
         }
@@ -175,9 +178,9 @@ void convert()
 }
 void PID_Speed(int rate_mm,TIM_HandleTypeDef *htim)
 {
-    Kp=0.001;
-	  Ki=0.8;
-	  Kd=0.01;			
+   // Kp=0.001;
+	//  Ki=0.8;
+	//  Kd=0.01;			
     Error=rate_mm-rate;
 	
     P_part=Kp*(Error-pre_Error);
@@ -200,18 +203,14 @@ void PID_Speed(int rate_mm,TIM_HandleTypeDef *htim)
     __HAL_TIM_SetCompare(&htim4,TIM_CHANNEL_1,Output);           //PWM
 }
 
-
-
 void PID_Position(int deg_mm,TIM_HandleTypeDef *htim)
 {
  
-   Kp=0.08;
-   Ki=0.5;
-   Kd=0.9;
- // 	Kp=0.1;
-	           
-	//	Ki=2;
-	            
+ //  Kp=0.08;
+ //  Ki=0.5;
+ //  Kd=0.9;
+  // 	Kp=0.1;        
+	//	Ki=2;         
 	//	Kd=0.03;
     vitri=pulse;
     Error=deg_mm-vitri;   
@@ -310,9 +309,9 @@ int main(void)
     if (Start_Process==1)
     {
       Start_Process=0;
-			switch(Rx_data_temp[0])                        
+			switch(Rx_data_temp[0])                // Kiem tra  Rx_data_temp[0]== lenh yeu cau              
 			{
-				case 73:            //tang setpoint I
+				case 73:                             // 'I'=73
 					if (speed==1)
 					{
             rate_mm+=100;
@@ -324,7 +323,7 @@ int main(void)
 					  PID_Position(deg_mm,&htim3);
 					}
 				break;
-				case 68:                   //giam D
+				case 68:                               // 'D'=68
 					if (speed==1)
 					{
             rate_mm-=100;
@@ -336,27 +335,33 @@ int main(void)
 						PID_Position(deg_mm,&htim3);
 					}
 				break;
-				case 115:                    //s
+				case 115:                               // 's'=115
 						Stop();
             RUN=1;
             position=0;
             speed=1;
-							//  sscanf(Rx_data_temp,"%d",&rate_mm_int);
-						//	  rate_mm=rate_mm_int;
             rate_mm=(Rx_data_temp[1]-48)*1000+(Rx_data_temp[2]-48)*100+(Rx_data_temp[3]-48)*10+(Rx_data_temp[4]-48);
+				    
+				    Kp=(Rx_data_temp[5]-48)+(Rx_data_temp[7]-48)*0.1+(Rx_data_temp[8]-48)*0.01+(Rx_data_temp[9]-48)*0.001;    
+				    Ki=(Rx_data_temp[10]-48)+(Rx_data_temp[12]-48)*0.1+(Rx_data_temp[13]-48)*0.01+(Rx_data_temp[14]-48)*0.001;
+				    Kd=(Rx_data_temp[15]-48)+(Rx_data_temp[17]-48)*0.1+(Rx_data_temp[18]-48)*0.01+(Rx_data_temp[19]-48)*0.001;
+				    
             PID_Speed(rate_mm,&htim3);
 				break;
-				case 112:                   //p
+				case 112:                               // 'p'=112
 						Stop();
             RUN=1;
             position=1;
             speed=0;
-						//sscanf(Rx_data_temp,"%d",&deg_mm_int);
-						//deg_mm=deg_mm_int;
             deg_mm=(Rx_data_temp[1]-48)*1000+(Rx_data_temp[2]-48)*100+(Rx_data_temp[3]-48)*10+(Rx_data_temp[4]-48);
+				
+				    Kp=(Rx_data_temp[5]-48)+(Rx_data_temp[7]-48)*0.1+(Rx_data_temp[8]-48)*0.01+(Rx_data_temp[9]-48)*0.001;    
+				    Ki=(Rx_data_temp[10]-48)+(Rx_data_temp[12]-48)*0.1+(Rx_data_temp[13]-48)*0.01+(Rx_data_temp[14]-48)*0.001;
+				    Kd=(Rx_data_temp[15]-48)+(Rx_data_temp[17]-48)*0.1+(Rx_data_temp[18]-48)*0.01+(Rx_data_temp[19]-48)*0.001;
+				
             PID_Position(deg_mm, &htim3);
 				break;
-				case 83:                //S
+				case 83:                               // 'S'=83
 						Stop();
 				break;
 		
@@ -364,7 +369,7 @@ int main(void)
    
      }
      	
-    if (display>=5)
+    if (display>=10)                         // 5*10=50ms gui du lieu ve PC
     {
       send_data();
       display = 0;
